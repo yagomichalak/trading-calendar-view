@@ -65,6 +65,7 @@
             <td style="padding:8px; text-align:right">{{ '%.2f$'|format(t.exit_price) }}</td>
             <td style="padding:8px; text-align:right" class="pl {% if t.profit >= 0 %}positive{% else %}negative{% endif %}">{{ '%.2f$'|format(t.profit) }}</td>
             <td style="padding:8px; text-align:center">
+              <a href="{{ url_for('edit_trade', trade_id=t.id) }}" style="background:#3498db; color:white; padding:6px 10px; border-radius:4px; text-decoration:none; margin-right:8px;">Edit</a>
               <form method="post" action="{{ url_for('delete_trade', trade_id=t.id) }}" style="display:inline;">
                 <button type="submit" onclick="return confirm('Delete trade {{ t.id }} ({{ t.symbol }})?')" style="background:#e74c3c; color:white; border:0; padding:6px 10px; border-radius:4px; cursor:pointer;">Delete</button>
               </form>

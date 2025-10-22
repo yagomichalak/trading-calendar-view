@@ -334,6 +334,71 @@ def create_app():
         # Redirect back to where the request came from, or to the trades listing
         return redirect(request.referrer or url_for('trades_view'))
 
+    @app.route("/trades/<int:trade_id>/edit", methods=["GET", "POST"])
+    def edit_trade(trade_id):
+        """Show edit form (GET) and apply updates (POST) for a trade."""
+        conn = get_db()
+        try:
+            with conn.cursor() as cur:
+                # GET: render form with current values
+                if request.method == "GET":
+                    cur.execute("SELECT id, trade_date, symbol, position_size, entry_price, exit_price, stop_loss, take_profit FROM trades WHERE id = %s", (trade_id,))
+                    row = cur.fetchone()
+                    if not row:
+                        flash("Trade not found.", "error")
+                        return redirect(url_for('trades_view'))
+                    ps_val = float(row["position_size"]) if row.get("position_size") is not None else 0.0
+                    ep_val = float(row["entry_price"]) if row.get("entry_price") is not None else 0.0
+                    xp_val = float(row["exit_price"]) if row.get("exit_price") is not None else 0.0
+                    profit_val = (xp_val - ep_val) * ps_val
+
+                    trade = {
+                        "id": row["id"],
+                        "trade_date": row["trade_date"],
+                        "symbol": row["symbol"],
+                        "position_size": ps_val,
+                        "entry_price": ep_val,
+                        "exit_price": xp_val,
+                        "profit": profit_val,
+                    }
+                    return render_template('trade_edit.html', trade=trade)
+
+                # POST: apply changes
+                symbol = request.form.get("symbol", "").strip().upper()
+                position_size = request.form.get("position_size")
+                entry_price = request.form.get("entry_price")
+                exit_price = request.form.get("exit_price")
+                trade_date = request.form.get("trade_date")
+                # require exit_price explicitly (profit is not editable)
+                if not (symbol and position_size and entry_price and exit_price and trade_date):
+                    flash("All required fields are required.", "error")
+                    return redirect(request.referrer or url_for('edit_trade', trade_id=trade_id))
+
+                try:
+                    ps_f = float(position_size)
+                    ep_f = float(entry_price)
+                    xp_f = float(exit_price)
+
+                    cur.execute("""
+                        UPDATE trades
+                        SET symbol = %s, position_size = %s, entry_price = %s, exit_price = %s, trade_date = %s
+                        WHERE id = %s
+                    """, (
+                        symbol,
+                        ps_f,
+                        ep_f,
+                        xp_f,
+                        trade_date,
+                        trade_id
+                    ))
+                    flash("Trade updated.", "ok")
+                except Exception as e:
+                    flash(f"DB error: {e}", "error")
+        finally:
+            conn.close()
+
+        return redirect(url_for('trades_view'))
+
     return app
 
 app = create_app()
