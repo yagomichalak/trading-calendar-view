@@ -1,4 +1,3 @@
-
 import os
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -55,10 +54,17 @@ def create_app():
         year = int(request.args.get("year", today.year))
         month = int(request.args.get("month", today.month))
         first_day = date(year, month, 1)
+
+        # next_month: jump to day 28, add 4 days (guaranteed next month), then set to 1st
         next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
         last_day = next_month - timedelta(days=1)
 
-        # Fetch day P/L for the month
+        # --- CHANGES START: compute the 6x7 GRID RANGE first
+        start_grid = first_day - timedelta(days=first_day.weekday())  # Monday of the grid
+        end_grid = start_grid + timedelta(days=41)  # inclusive last cell (6*7 - 1)
+        # --- CHANGES END
+
+        # Fetch day P/L only for the actual month (as before)
         conn = get_db()
         try:
             with conn.cursor() as cur:
@@ -69,33 +75,35 @@ def create_app():
                 """, (first_day, last_day))
                 day_rows = cur.fetchall()
 
-                # Fetch weeks overlapping month for week P/L display on weekends
+                # --- CHANGES START:
+                # Fetch weeks that overlap the VISIBLE GRID, not just the month.
+                # This ensures spillover weekends (e.g., Nov 1/2 showing in the Oct view) get a week total.
                 cur.execute("""
                     SELECT id, start_date, end_date, week_pl
                     FROM weeks
                     WHERE NOT (end_date < %s OR start_date > %s)
-                """, (first_day, last_day))
+                """, (start_grid, end_grid))
                 weeks = cur.fetchall()
+                # --- CHANGES END
         finally:
             conn.close()
 
         day_pl_map = { r["date"]: float(r["day_pl"]) for r in day_rows }
-        # Compute display Saturday for each week, even if week range is Mon–Fri in DB
+
+        # Compute display Saturday/Sunday for each week and place week_pl on both weekend days
         weekend_weekpl_map = {}
         for w in weeks:
-            # Find the Saturday within that ISO week (or the immediate Saturday after a Fri end_date)
-            # Start from the week's start_date and jump to Saturday (weekday=5)
+            # Saturday of that ISO week
             wd = w["start_date"].weekday()  # 0=Mon .. 6=Sun
             days_to_sat = (5 - wd) % 7
             saturday = w["start_date"] + timedelta(days=days_to_sat)
+            sunday = saturday + timedelta(days=1)
 
-            # If DB stores weeks Mon–Fri (end_date Friday), saturday will be end_date+1 — that's fine for display.
-            if saturday.month == month:
+            # Only assign if the weekend day is inside the visible grid
+            if start_grid <= saturday <= end_grid:
                 weekend_weekpl_map[saturday] = float(w["week_pl"])
 
-
-        # Build a 6x7 grid starting from Monday of the week containing the 1st
-        start_grid = first_day - timedelta(days=(first_day.weekday()))
+        # Build the 6x7 grid
         cells = []
         d = start_grid
         for _ in range(6*7):
