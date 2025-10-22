@@ -19,6 +19,17 @@ flask --app app init-db
 ```
 This executes `tradingview_structure.sql` (triggers, views, tables).
 
+Or run on the terminal:
+```bash
+mysql -u root -p
+CREATE DATABASE tradingview;
+exit
+```
+And then
+```bash
+mysql -u root -p tradingview < tradingview_structure.sql
+```
+
 ## 3) Run the app
 ```bash
 flask --app app run --debug
