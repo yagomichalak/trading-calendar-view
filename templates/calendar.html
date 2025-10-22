@@ -12,12 +12,17 @@
             {{ '%+.2f'|format(cell.day_pl) }}
             <br>
           </div>
-          <div class="pl {% if cell.day_pl >= 0 %}risk{% else %}negative{% endif %}">
-            ⚠️{{ '%.2f'|format(cell.daily_risk) }}
+        {% else %}
+          <div class="subtle">No trades</div>
+        {% endif %}
+
+        {% if cell.daily_risk %}
+          <div class="pl risk">
+              {{ '⚠️%.2f'|format(cell.daily_risk) }}
             <br>
           </div>
         {% else %}
-          <div class="subtle">No trades</div>
+          <div class="subtle">Daily risk: —</div>
         {% endif %}
         {% if cell.week_pl is not none %}
           <div class="weekpl">Week total: {{ '%+.2f'|format(cell.week_pl) }}</div>

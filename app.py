@@ -80,7 +80,7 @@ def create_app():
                 # Fetch weeks that overlap the VISIBLE GRID, not just the month.
                 # This ensures spillover weekends (e.g., Nov 1/2 showing in the Oct view) get a week total.
                 cur.execute("""
-                    SELECT id, start_date, end_date, week_pl
+                    SELECT id, start_date, end_date, week_pl, starting_balance
                     FROM weeks
                     WHERE NOT (end_date < %s OR start_date > %s)
                 """, (start_grid, end_grid))
@@ -98,30 +98,45 @@ def create_app():
             } for r in day_rows
         }
 
-        # Compute display Saturday/Sunday for each week and place week_pl on both weekend days
-        weekend_weekpl_map = {}
+        # Map each date in the visible grid to its week data (starting_balance and week_pl)
+        week_date_map = {}
+        saturday_weekpl = {}
         for w in weeks:
-            # Saturday of that ISO week
-            wd = w["start_date"].weekday()  # 0=Mon .. 6=Sun
+            w_start = w["start_date"]
+            w_end = w["end_date"]
+            # overlap with visible grid
+            start = max(w_start, start_grid)
+            end = min(w_end, end_grid)
+            sb = float(w["starting_balance"])
+            wp = float(w["week_pl"])
+            # assign week data to each date in this week's overlap with the grid
+            d_iter = start
+            while d_iter <= end:
+                week_date_map[d_iter] = {"starting_balance": sb, "week_pl": wp}
+                d_iter += timedelta(days=1)
+            # compute saturday for optional display of week total on weekend
+            wd = w_start.weekday()
             days_to_sat = (5 - wd) % 7
-            saturday = w["start_date"] + timedelta(days=days_to_sat)
-
-            # Only assign if the weekend day is inside the visible grid
+            saturday = w_start + timedelta(days=days_to_sat)
             if start_grid <= saturday <= end_grid:
-                weekend_weekpl_map[saturday] = float(w["week_pl"])
+                saturday_weekpl[saturday] = wp
 
         # Build the 6x7 grid
         cells = []
         d = start_grid
         for _ in range(6*7):
             day_pl = day_pl_map.get(d)
+            weekinfo = week_date_map.get(d)
+
             cells.append({
                 "date": d,
                 "in_month": d.month == month,
                 "day_pl": day_pl["day_pl"] if day_pl else None,
-                "week_pl": weekend_weekpl_map.get(d) if d.weekday() >= 5 else None,
+                # show week total only on weekend cells (Saturday/Sunday) when available
+                "week_pl": saturday_weekpl.get(d) if d.weekday() >= 5 else None,
                 "risk10": day_pl["risk10"] if day_pl else None,
-                "daily_risk": ((day_pl["entry_balance"] * default_risk) / 100) if day_pl else None,
+                # calculate daily risk from the week data: ((starting_balance + week_pl) * default_risk) / 100
+                "daily_risk": ((weekinfo["starting_balance"] + weekinfo["week_pl"]) * default_risk) / 100 if weekinfo else None,
             })
             d += timedelta(days=1)
 
