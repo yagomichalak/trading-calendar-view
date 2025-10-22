@@ -24,23 +24,23 @@
         </tr>
         <tr>
           <th style="text-align:left; padding:8px">Entry Price</th>
-          <td style="padding:8px">{{ '$%.2f'|format(trade.entry_price) }}</td>
+          <td style="padding:8px">{{ '%.2f$'|format(trade.entry_price) }}</td>
         </tr>
         <tr>
           <th style="text-align:left; padding:8px">Exit Price</th>
-          <td style="padding:8px">{{ '$%.2f'|format(trade.exit_price) }}</td>
+          <td style="padding:8px">{{ '%.2f$'|format(trade.exit_price) }}</td>
         </tr>
         <tr>
           <th style="text-align:left; padding:8px">Stop Loss</th>
-          <td style="padding:8px">{{ '$%.2f'|format(trade.stop_loss) if trade.stop_loss else '—' }}</td>
+          <td style="padding:8px">{{ '%.2f$'|format(trade.stop_loss) if trade.stop_loss else '—' }}</td>
         </tr>
         <tr>
           <th style="text-align:left; padding:8px">Take Profit</th>
-          <td style="padding:8px">{{ '$%.2f'|format(trade.take_profit) if trade.take_profit else '—' }}</td>
+          <td style="padding:8px">{{ '%.2f$'|format(trade.take_profit) if trade.take_profit else '—' }}</td>
         </tr>
         <tr>
           <th style="text-align:left; padding:8px">Profit</th>
-          <td style="padding:8px" class="pl {% if trade.profit >= 0 %}positive{% else %}negative{% endif %}">{{ '$%.2f'|format(trade.profit) }}</td>
+          <td style="padding:8px" class="pl {% if trade.profit >= 0 %}positive{% else %}negative{% endif %}">{{ '%.2f$'|format(trade.profit) }}</td>
         </tr>
       </table>
     </div>
@@ -55,19 +55,19 @@
           </tr>
           <tr>
             <th style="text-align:left; padding:8px">Entry Balance</th>
-            <td style="padding:8px">{{ '$%.2f'|format(day.entry_balance) }}</td>
+            <td style="padding:8px">{{ '%.2f$'|format(day.entry_balance) }}</td>
           </tr>
           <tr>
             <th style="text-align:left; padding:8px">Day P/L</th>
-            <td style="padding:8px" class="pl {% if day.day_pl >= 0 %}positive{% else %}negative{% endif %}">{{ '$%.2f'|format(day.day_pl) }}</td>
+            <td style="padding:8px" class="pl {% if day.day_pl >= 0 %}positive{% else %}negative{% endif %}">{{ '%.2f$'|format(day.day_pl) }}</td>
           </tr>
           <tr>
             <th style="text-align:left; padding:8px">Current Balance</th>
-            <td style="padding:8px">{{ '$%.2f'|format(day.current_balance) }}</td>
+            <td style="padding:8px">{{ '%.2f$'|format(day.current_balance) }}</td>
           </tr>
           <tr>
             <th style="text-align:left; padding:8px">Risk (10%)</th>
-            <td style="padding:8px">{{ '$%.2f'|format(day.risk10) if day.risk10 else '—' }}</td>
+            <td style="padding:8px">{{ '%.2f$'|format(day.risk10) if day.risk10 else '—' }}</td>
           </tr>
         </table>
       </div>
