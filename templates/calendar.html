@@ -2,13 +2,6 @@
 {% extends "base.html" %}
 {% block content %}
   <h2>{{ first_day.strftime('%B %Y') }}</h2>
-  <div class="dow">Mon</div>
-  <div class="dow">Tue</div>
-  <div class="dow">Wed</div>
-  <div class="dow">Thu</div>
-  <div class="dow">Fri</div>
-  <div class="dow">Sat</div>
-  <div class="dow">Sun</div>
 
   <div class="calendar">
     {% for cell in cells %}
