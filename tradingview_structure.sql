@@ -156,7 +156,8 @@ END IF;
 SET NEW.day_id = v_day_id;
 END IF;
 END */
-; ;
+;
+;
 DELIMITER;
 /*!50003 SET sql_mode              = @saved_sql_mode */
 ;
@@ -201,7 +202,8 @@ JOIN tradingview.days d ON d.week_id = w.id
 SET w.week_pl = COALESCE((SELECT SUM(d2.day_pl) FROM tradingview.days d2 WHERE d2.week_id = w.id), 0)
 WHERE d.id = NEW.day_id;
 END */
-; ;
+;
+;
 DELIMITER;
 /*!50003 SET sql_mode              = @saved_sql_mode */
 ;
@@ -246,7 +248,8 @@ WHERE w.id IN (
 SELECT week_id FROM tradingview.days WHERE id IN (OLD.day_id, NEW.day_id)
 );
 END */
-; ;
+;
+;
 DELIMITER;
 /*!50003 SET sql_mode              = @saved_sql_mode */
 ;
@@ -289,7 +292,8 @@ JOIN tradingview.days d ON d.week_id = w.id
 SET w.week_pl = COALESCE((SELECT SUM(d2.day_pl) FROM tradingview.days d2 WHERE d2.week_id = w.id), 0)
 WHERE d.id = OLD.day_id;
 END */
-; ;
+;
+;
 DELIMITER;
 /*!50003 SET sql_mode              = @saved_sql_mode */
 ;
