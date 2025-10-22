@@ -10,6 +10,11 @@
         {% if cell.day_pl is not none %}
           <div class="pl {% if cell.day_pl >= 0 %}positive{% else %}negative{% endif %}">
             {{ '%+.2f'|format(cell.day_pl) }}
+            <br>
+          </div>
+          <div class="pl {% if cell.day_pl >= 0 %}risk{% else %}negative{% endif %}">
+            ⚠️{{ '%.2f'|format(cell.daily_risk) }}
+            <br>
           </div>
         {% else %}
           <div class="subtle">No trades</div>

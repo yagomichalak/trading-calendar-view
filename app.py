@@ -54,6 +54,7 @@ def create_app():
         year = int(request.args.get("year", today.year))
         month = int(request.args.get("month", today.month))
         first_day = date(year, month, 1)
+        default_risk = 10
 
         # next_month: jump to day 28, add 4 days (guaranteed next month), then set to 1st
         next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -69,7 +70,7 @@ def create_app():
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT date, day_pl
+                    SELECT date, day_pl, risk10, entry_balance, current_balance
                     FROM days
                     WHERE date BETWEEN %s AND %s
                 """, (first_day, last_day))
@@ -88,7 +89,14 @@ def create_app():
         finally:
             conn.close()
 
-        day_pl_map = { r["date"]: float(r["day_pl"]) for r in day_rows }
+        day_pl_map = { 
+            r["date"]: {
+                "day_pl": float(r["day_pl"]),
+                "risk10": r["risk10"],
+                "entry_balance": float(r["entry_balance"]),
+                "current_balance": r["current_balance"],
+            } for r in day_rows
+        }
 
         # Compute display Saturday/Sunday for each week and place week_pl on both weekend days
         weekend_weekpl_map = {}
@@ -97,7 +105,6 @@ def create_app():
             wd = w["start_date"].weekday()  # 0=Mon .. 6=Sun
             days_to_sat = (5 - wd) % 7
             saturday = w["start_date"] + timedelta(days=days_to_sat)
-            sunday = saturday + timedelta(days=1)
 
             # Only assign if the weekend day is inside the visible grid
             if start_grid <= saturday <= end_grid:
@@ -107,11 +114,14 @@ def create_app():
         cells = []
         d = start_grid
         for _ in range(6*7):
+            day_pl = day_pl_map.get(d)
             cells.append({
                 "date": d,
                 "in_month": d.month == month,
-                "day_pl": day_pl_map.get(d),
-                "week_pl": weekend_weekpl_map.get(d) if d.weekday() >= 5 else None
+                "day_pl": day_pl["day_pl"] if day_pl else None,
+                "week_pl": weekend_weekpl_map.get(d) if d.weekday() >= 5 else None,
+                "risk10": day_pl["risk10"] if day_pl else None,
+                "daily_risk": ((day_pl["entry_balance"] * default_risk) / 100) if day_pl else None,
             })
             d += timedelta(days=1)
 
