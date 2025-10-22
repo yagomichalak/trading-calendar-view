@@ -315,6 +315,25 @@ def create_app():
             
         return render_template("trade_detail.html", trade=trade, day=day)
 
+    @app.route("/trades/<int:trade_id>/delete", methods=["POST"])
+    def delete_trade(trade_id):
+        """Delete a trade by id and redirect back to the trades list or referrer."""
+        conn = get_db()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM trades WHERE id = %s", (trade_id,))
+                if cur.rowcount == 0:
+                    flash("Trade not found.", "error")
+                else:
+                    flash("Trade deleted.", "ok")
+        except Exception as e:
+            flash(f"DB error: {e}", "error")
+        finally:
+            conn.close()
+
+        # Redirect back to where the request came from, or to the trades listing
+        return redirect(request.referrer or url_for('trades_view'))
+
     return app
 
 app = create_app()
