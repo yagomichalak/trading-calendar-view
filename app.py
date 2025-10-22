@@ -183,6 +183,11 @@ def create_app():
             flash(f"DB error: {e}", "error")
         finally:
             conn.close()
+
+        # If request came from trades page, redirect back there
+        if request.referrer and '/trades' in request.referrer:
+            return redirect(url_for('trades_view'))
+        # Otherwise redirect to calendar view (legacy behavior)
         return redirect(url_for("calendar_view", year=trade_date[:4], month=int(trade_date[5:7])))
 
     @app.route("/trades", methods=["GET"])

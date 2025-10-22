@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div style="margin-bottom:16px;">
+    <a href="{{ url_for('trades_view') }}" class="subtle">&larr; Back to Trades</a>
+  </div>
+
+  <h2>Trade Details</h2>
+  
+  {% if trade %}
+    <div class="card" style="margin-bottom:24px;">
+      <table style="width:100%; border-collapse: collapse;">
+        <tr>
+          <th style="text-align:left; padding:8px; width:140px;">Date</th>
+          <td style="padding:8px">{{ trade.trade_date }}</td>
+        </tr>
+        <tr>
+          <th style="text-align:left; padding:8px">Symbol</th>
+          <td style="padding:8px">{{ trade.symbol }}</td>
+        </tr>
+        <tr>
+          <th style="text-align:left; padding:8px">Position Size</th>
+          <td style="padding:8px">{{ trade.position_size }}</td>
+        </tr>
+        <tr>
+          <th style="text-align:left; padding:8px">Entry Price</th>
+          <td style="padding:8px">{{ '$%.2f'|format(trade.entry_price) }}</td>
+        </tr>
+        <tr>
+          <th style="text-align:left; padding:8px">Exit Price</th>
+          <td style="padding:8px">{{ '$%.2f'|format(trade.exit_price) }}</td>
+        </tr>
+        <tr>
+          <th style="text-align:left; padding:8px">Stop Loss</th>
+          <td style="padding:8px">{{ '$%.2f'|format(trade.stop_loss) if trade.stop_loss else '—' }}</td>
+        </tr>
+        <tr>
+          <th style="text-align:left; padding:8px">Take Profit</th>
+          <td style="padding:8px">{{ '$%.2f'|format(trade.take_profit) if trade.take_profit else '—' }}</td>
+        </tr>
+        <tr>
+          <th style="text-align:left; padding:8px">Profit</th>
+          <td style="padding:8px" class="pl {% if trade.profit >= 0 %}positive{% else %}negative{% endif %}">{{ '$%.2f'|format(trade.profit) }}</td>
+        </tr>
+      </table>
+    </div>
+
+    {% if day %}
+      <h3>Day Summary</h3>
+      <div class="card">
+        <table style="width:100%; border-collapse: collapse;">
+          <tr>
+            <th style="text-align:left; padding:8px; width:140px;">Date</th>
+            <td style="padding:8px">{{ day.date }}</td>
+          </tr>
+          <tr>
+            <th style="text-align:left; padding:8px">Entry Balance</th>
+            <td style="padding:8px">{{ '$%.2f'|format(day.entry_balance) }}</td>
+          </tr>
+          <tr>
+            <th style="text-align:left; padding:8px">Day P/L</th>
+            <td style="padding:8px" class="pl {% if day.day_pl >= 0 %}positive{% else %}negative{% endif %}">{{ '$%.2f'|format(day.day_pl) }}</td>
+          </tr>
+          <tr>
+            <th style="text-align:left; padding:8px">Current Balance</th>
+            <td style="padding:8px">{{ '$%.2f'|format(day.current_balance) }}</td>
+          </tr>
+          <tr>
+            <th style="text-align:left; padding:8px">Risk (10%)</th>
+            <td style="padding:8px">{{ '$%.2f'|format(day.risk10) if day.risk10 else '—' }}</td>
+          </tr>
+        </table>
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="subtle">Trade not found.</p>
+  {% endif %}
+{% endblock %}

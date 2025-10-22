@@ -2,6 +2,35 @@
 
 {% block content %}
   <h2>Trades</h2>
+  
+  <div class="card" style="margin-bottom:24px; padding:16px;">
+    <form method="post" action="{{ url_for('create_trade') }}" style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-end;">
+        <div style="flex:0 1 120px;">
+          <label class="subtle">Symbol</label>
+          <input type="text" name="symbol" required placeholder="AAPL" style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 1 140px;">
+          <label class="subtle">Position Size</label>
+          <input type="number" name="position_size" required step="0.0001" style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 1 140px;">
+          <label class="subtle">Entry Price</label>
+          <input type="number" name="entry_price" required step="0.0001" style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 1 140px;">
+          <label class="subtle">Exit Price</label>
+          <input type="number" name="exit_price" required step="0.0001" style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 1 160px;">
+          <label class="subtle">Date</label>
+          <input type="date" name="trade_date" required style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 0 auto;">
+          <button type="submit">Add Trade</button>
+        </div>
+    </form>
+  </div>
+
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
     <div class="subtle">Showing page {{ page }} of {{ total_pages }} ({{ total }} total)</div>
     <div>
@@ -54,4 +83,15 @@
   {% else %}
     <p class="subtle">No trades found.</p>
   {% endif %}
+
+  <script>
+    // Set today's date as default for the trade date picker
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      document.querySelector('input[name="trade_date"]').value = `${year}-${month}-${day}`;
+    });
+  </script>
 {% endblock %}
