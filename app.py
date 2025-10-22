@@ -69,7 +69,6 @@ def create_app():
         month = int(request.args.get("month", today.month))
         first_day = date(year, month, 1)
         default_risk = 10
-        current_balance = 0
 
         # next_month: jump to day 28, add 4 days (guaranteed next month), then set to 1st
         next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -219,7 +218,6 @@ def create_app():
 
         conn = get_db()
         trades = []
-        current_balance = 0
         total = 0
         try:
             with conn.cursor() as cur:
