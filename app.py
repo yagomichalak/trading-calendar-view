@@ -55,6 +55,7 @@ def create_app():
         month = int(request.args.get("month", today.month))
         first_day = date(year, month, 1)
         default_risk = 10
+        current_balance = 0
 
         # next_month: jump to day 28, add 4 days (guaranteed next month), then set to 1st
         next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -86,6 +87,11 @@ def create_app():
                 """, (start_grid, end_grid))
                 weeks = cur.fetchall()
                 # --- CHANGES END
+
+                cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
+                row = cur.fetchone()
+                if row and row.get("current_balance") is not None:
+                    current_balance = float(row["current_balance"])
         finally:
             conn.close()
 
@@ -149,7 +155,8 @@ def create_app():
                                cells=cells,
                                first_day=first_day,
                                prev_year=prev_month.year, prev_month=prev_month.month,
-                               next_year=next_month_x.year, next_month=next_month_x.month)
+                               next_year=next_month_x.year, next_month=next_month_x.month,
+                               current_balance=current_balance)
 
     @app.route("/trades/new", methods=["POST"])
     def create_trade():
