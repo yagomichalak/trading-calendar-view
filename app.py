@@ -41,6 +41,69 @@ def create_app():
             conn.close()
         return dict(current_balance=current_balance)
 
+    def recompute_from_date(start_date):
+        """Recompute entry_balance, day_pl, current_balance and risk10 for all days from start_date onwards,
+        and update affected weeks' week_pl. This is useful when a past trade is edited/deleted and later days
+        need their starting balances adjusted to reflect the change.
+        start_date may be a date or a string (YYYY-MM-DD).
+        """
+        conn = get_db()
+        try:
+            with conn.cursor() as cur:
+                # Ensure start_date is a date-compatible value
+                cur.execute("SELECT id, date, week_id FROM days WHERE date >= %s ORDER BY date ASC", (start_date,))
+                days = cur.fetchall()
+
+                # nothing to do if no days affected
+                if not days:
+                    return
+
+                affected_weeks = set()
+
+                for d in days:
+                    d_id = d["id"]
+                    d_date = d["date"]
+                    w_id = d.get("week_id")
+                    affected_weeks.add(w_id)
+
+                    # previous balance: most recent current_balance for date < d_date
+                    cur.execute("SELECT current_balance FROM days WHERE date < %s ORDER BY date DESC LIMIT 1", (d_date,))
+                    prev = cur.fetchone()
+                    if prev and prev.get("current_balance") is not None:
+                        prev_balance = float(prev["current_balance"])
+                    else:
+                        # fallback to week's starting_balance
+                        prev_balance = 0.0
+                        if w_id is not None:
+                            cur.execute("SELECT starting_balance FROM weeks WHERE id = %s", (w_id,))
+                            wrow = cur.fetchone()
+                            if wrow and wrow.get("starting_balance") is not None:
+                                prev_balance = float(wrow["starting_balance"])
+
+                    # recompute day_pl from trades for this day
+                    cur.execute("SELECT COALESCE(SUM(profit), 0) as s FROM trades WHERE day_id = %s", (d_id,))
+                    srow = cur.fetchone()
+                    day_pl = float(srow["s"]) if srow and srow.get("s") is not None else 0.0
+
+                    entry_balance = prev_balance
+                    current_balance = entry_balance + day_pl
+                    risk10 = round(entry_balance * 0.10, 2)
+
+                    cur.execute("""
+                        UPDATE days
+                        SET entry_balance = %s, day_pl = %s, current_balance = %s, risk10 = %s
+                        WHERE id = %s
+                    """, (entry_balance, day_pl, current_balance, risk10, d_id))
+
+                # Recompute week totals for affected weeks
+                for w in affected_weeks:
+                    if w is None:
+                        continue
+                    cur.execute("UPDATE weeks SET week_pl = COALESCE((SELECT SUM(d2.day_pl) FROM days d2 WHERE d2.week_id = weeks.id), 0) WHERE id = %s", (w,))
+            # commit is enabled by autocommit in get_db
+        finally:
+            conn.close()
+
     @app.cli.command("init-db")
     def init_db():
         """Initialize the MySQL schema/triggers/views from ./tradingview_structure.sql"""
@@ -190,6 +253,11 @@ def create_app():
             flash(f"DB error: {e}", "error")
         finally:
             conn.close()
+        # Recompute balances from the trade date so subsequent days are updated
+        try:
+            recompute_from_date(trade_date)
+        except Exception:
+            print("Failed to recompute after creating trade")
 
         # If request came from trades page, redirect back there
         if request.referrer and '/trades' in request.referrer:
@@ -319,8 +387,17 @@ def create_app():
     def delete_trade(trade_id):
         """Delete a trade by id and redirect back to the trades list or referrer."""
         conn = get_db()
+        deleted_trade_date = None
         try:
             with conn.cursor() as cur:
+                # capture the trade_date before deletion so we know from which date to recompute
+                cur.execute("SELECT trade_date, day_id FROM trades WHERE id = %s", (trade_id,))
+                row = cur.fetchone()
+                if not row:
+                    flash("Trade not found.", "error")
+                    return redirect(request.referrer or url_for('trades_view'))
+                deleted_trade_date = row.get("trade_date")
+
                 cur.execute("DELETE FROM trades WHERE id = %s", (trade_id,))
                 if cur.rowcount == 0:
                     flash("Trade not found.", "error")
@@ -330,6 +407,14 @@ def create_app():
             flash(f"DB error: {e}", "error")
         finally:
             conn.close()
+
+        # If we deleted a trade from a past date, recompute subsequent days so entry_balance reflects the removal
+        try:
+            if deleted_trade_date:
+                recompute_from_date(deleted_trade_date)
+        except Exception:
+            # don't prevent user flow on recompute errors; just log to console
+            print("Failed to recompute days after deleting trade", trade_id)
 
         # Redirect back to where the request came from, or to the trades listing
         return redirect(request.referrer or url_for('trades_view'))
@@ -397,7 +482,13 @@ def create_app():
         finally:
             conn.close()
 
-        return redirect(url_for('trades_view'))
+            # Recompute balances from the trade date so subsequent days are updated
+            try:
+                recompute_from_date(trade_date)
+            except Exception:
+                print("Failed to recompute after editing trade")
+
+            return redirect(url_for('trades_view'))
 
     return app
 

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div style="margin-bottom:16px;">
+    <a href="{{ url_for('trades_view') }}" class="subtle">&larr; Back to Trades</a>
+  </div>
+
+  <h2>Edit Trade</h2>
+
+  {% if trade %}
+    <div class="card" style="padding:16px;">
+      <form method="post" action="{{ url_for('edit_trade', trade_id=trade.id) }}" style="display:flex; flex-wrap:wrap; gap:24px; column-gap:24px; align-items:flex-end;">
+        <div style="flex:0 1 180px; min-width:140px;">
+          <label class="subtle">Date</label>
+          <input type="date" name="trade_date" required value="{{ trade.trade_date }}" style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 1 140px; min-width:120px;">
+          <label class="subtle">Symbol</label>
+          <input type="text" name="symbol" required value="{{ trade.symbol }}" style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 1 160px; min-width:130px;">
+          <label class="subtle">Position Size</label>
+          <input type="number" name="position_size" required step="0.0001" value="{{ trade.position_size }}" style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 1 160px; min-width:130px;">
+          <label class="subtle">Entry Price</label>
+          <input type="number" name="entry_price" required step="0.0001" value="{{ trade.entry_price }}" style="width:100%; margin-top:6px;">
+        </div>
+        <div style="flex:0 1 160px; min-width:130px;">
+          <label class="subtle">Exit Price</label>
+          <input type="number" name="exit_price" required step="0.0001" value="{{ trade.exit_price }}" style="width:100%; margin-top:6px;">
+        </div>
+        <!-- Profit is intentionally hidden in the edit form -->
+        <div style="flex:0 0 auto;">
+          <button type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  {% else %}
+    <p class="subtle">Trade not found.</p>
+  {% endif %}
+{% endblock %}
