@@ -34,7 +34,7 @@
   </head>
   <body>
     <header>
-      <div><strong>Trading Calendar</strong></div>
+      <div><a href="{{ url_for('calendar_view') }}"><strong>Trading Calendar</strong></a></div>
       <div class="header-center">Balance:
         {% if current_balance is not none %}
           <span class="pl {% if current_balance >= 0 %}positive{% else %}negative{% endif %}">{{ '%.2f'|format(current_balance) }}</span>
@@ -46,6 +46,8 @@
         <a href="{{ url_for('calendar_view', year=prev_year, month=prev_month) }}">&larr; Prev</a>
         &nbsp;|&nbsp;
         <a href="{{ url_for('calendar_view', year=next_year, month=next_month) }}">Next &rarr;</a>
+        &nbsp;|&nbsp;
+        <a href="{{ url_for('trades_view') }}">Trades</a>
       </nav>
     </header>
     <div class="container">

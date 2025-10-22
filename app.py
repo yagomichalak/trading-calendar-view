@@ -185,6 +185,42 @@ def create_app():
             conn.close()
         return redirect(url_for("calendar_view", year=trade_date[:4], month=int(trade_date[5:7])))
 
+    @app.route("/trades", methods=["GET"])
+    def trades_view():
+        """Display list of trades with computed profit."""
+        conn = get_db()
+        trades = []
+        current_balance = 0
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT trade_date, symbol, position_size, entry_price, exit_price FROM trades ORDER BY trade_date DESC, id DESC")
+                rows = cur.fetchall()
+                for r in rows:
+                    # ensure floats
+                    ps = float(r["position_size"]) if r.get("position_size") is not None else 0.0
+                    ep = float(r["entry_price"]) if r.get("entry_price") is not None else 0.0
+                    xp = float(r["exit_price"]) if r.get("exit_price") is not None else 0.0
+                    # profit calculation: (exit_price - entry_price) * position_size
+                    profit = (xp - ep) * ps
+                    trades.append({
+                        "trade_date": r["trade_date"],
+                        "symbol": r["symbol"],
+                        "position_size": ps,
+                        "entry_price": ep,
+                        "exit_price": xp,
+                        "profit": profit,
+                    })
+                
+                # get current balance for header display
+                cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
+                row = cur.fetchone()
+                if row and row.get("current_balance") is not None:
+                    current_balance = float(row["current_balance"])
+        finally:
+            conn.close()
+
+        return render_template("trades.html", trades=trades, current_balance=current_balance)
+
     return app
 
 app = create_app()
