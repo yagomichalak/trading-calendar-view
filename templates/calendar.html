@@ -26,22 +26,49 @@
         {% endif %}
 
 
-        <details style="margin-top:8px;">
-          <summary>Add trade</summary>
-          <form action="{{ url_for('create_trade') }}" method="post">
-            <input type="hidden" name="trade_date" value="{{ cell.date.isoformat() }}"/>
-            <input name="symbol" placeholder="SYM" style="width:72px"/>
-            <input name="position_size" type="number" step="1" placeholder="Qty" style="width:80px"/>
-            <input name="entry_price" type="number" step="0.01" placeholder="Entry" style="width:90px"/>
-            <input name="exit_price" type="number" step="0.01" placeholder="Exit" style="width:90px"/>
-            <button type="submit">Save</button>
-          </form>
-          <div class="subtle">Only trades are entered manually; balances update via triggers.</div>
-        </details>
+  <button class="add-trade-btn" onclick="openTradeModal('{{ cell.date.isoformat() }}')" title="Add trade" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:18px;line-height:1;border-radius:50%;border:none;background:var(--cell-bg,#121a26);cursor:pointer;">+</button>
+        <!-- Trade Modal -->
+        <div class="trade-modal" id="trade-modal-{{ cell.date.isoformat() }}" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:1000;align-items:center;justify-content:center;">
+          <div style="background:var(--cell-bg,#121a26);padding:24px 32px;border-radius:8px;min-width:320px;position:relative;box-shadow:0 2px 16px rgba(0,0,0,0.2);">
+            <style>
+              .calendar .card, .trade-modal > div {
+                --cell-bg: #121a26;
+              }
+            </style>
+            <button onclick="closeTradeModal('{{ cell.date.isoformat() }}')" style="position:absolute;top:8px;right:8px;font-size:18px;border:none;background:none;cursor:pointer;">&times;</button>
+            <h3>Add Trade for {{ cell.date.strftime('%d %b %Y') }}</h3>
+            <form action="{{ url_for('create_trade') }}" method="post">
+              <input type="hidden" name="trade_date" value="{{ cell.date.isoformat() }}"/>
+              <input name="symbol" type="text" placeholder="SYM" style="width:72px"/>
+              <input name="position_size" type="number" step="1" placeholder="Qty" style="width:80px"/>
+              <input name="entry_price" type="number" step="0.01" placeholder="Entry" style="width:90px"/>
+              <input name="exit_price" type="number" step="0.01" placeholder="Exit" style="width:90px"/>
+              <button type="submit">Save</button>
+            </form>
+            <div class="subtle" style="margin-top:8px;">Only trades are entered manually; balances update via triggers.</div>
+          </div>
+        </div>
         {% if cell.week_pl is not none %}
           <div class="weekpl">Week total: {{ '%+.2f$'|format(cell.week_pl) }}</div>
         {% endif %}
       </div>
+
+      <script>
+      function openTradeModal(date) {
+        var modal = document.getElementById('trade-modal-' + date);
+        if (modal) modal.style.display = 'flex';
+      }
+      function closeTradeModal(date) {
+        var modal = document.getElementById('trade-modal-' + date);
+        if (modal) modal.style.display = 'none';
+      }
+      // Optional: close modal on background click
+      document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('trade-modal')) {
+          e.target.style.display = 'none';
+        }
+      });
+      </script>
     {% endfor %}
   </div>
 
