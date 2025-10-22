@@ -2,6 +2,17 @@
 
 {% block content %}
   <h2>Trades</h2>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div class="subtle">Showing page {{ page }} of {{ total_pages }} ({{ total }} total)</div>
+    <div>
+      <form method="get" style="display:inline-block;">
+        <label class="subtle">Per page:</label>
+        <input type="number" name="per_page" value="{{ per_page }}" min="1" style="width:72px;">
+        <input type="hidden" name="page" value="1">
+        <button type="submit">Set</button>
+      </form>
+    </div>
+  </div>
   {% if trades %}
     <table style="width:100%; border-collapse: collapse;">
       <thead>
@@ -27,6 +38,19 @@
         {% endfor %}
       </tbody>
     </table>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+      <div>
+        {% if page > 1 %}
+          <a href="?page={{ page-1 }}&per_page={{ per_page }}">&larr; Prev</a>
+        {% endif %}
+      </div>
+      <div class="subtle">Page {{ page }} / {{ total_pages }}</div>
+      <div>
+        {% if page < total_pages %}
+          <a href="?page={{ page+1 }}&per_page={{ per_page }}">Next &rarr;</a>
+        {% endif %}
+      </div>
+    </div>
   {% else %}
     <p class="subtle">No trades found.</p>
   {% endif %}

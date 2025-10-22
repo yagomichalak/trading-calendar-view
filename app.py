@@ -188,12 +188,35 @@ def create_app():
     @app.route("/trades", methods=["GET"])
     def trades_view():
         """Display list of trades with computed profit."""
+        # pagination
+        try:
+            page = int(request.args.get("page", "1"))
+        except ValueError:
+            page = 1
+        try:
+            per_page = int(request.args.get("per_page", "10"))
+        except ValueError:
+            per_page = 20
+        if per_page <= 0:
+            per_page = 20
+        if page <= 0:
+            page = 1
+
+        offset = (page - 1) * per_page
+
         conn = get_db()
         trades = []
         current_balance = 0
+        total = 0
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT trade_date, symbol, position_size, entry_price, exit_price FROM trades ORDER BY trade_date DESC, id DESC")
+                # total count for pagination
+                cur.execute("SELECT COUNT(*) as cnt FROM trades")
+                cnt_row = cur.fetchone()
+                total = int(cnt_row["cnt"]) if cnt_row and cnt_row.get("cnt") is not None else 0
+
+                # fetch page of trades
+                cur.execute("SELECT trade_date, symbol, position_size, entry_price, exit_price FROM trades ORDER BY trade_date DESC, id DESC LIMIT %s OFFSET %s", (per_page, offset))
                 rows = cur.fetchall()
                 for r in rows:
                     # ensure floats
@@ -210,7 +233,7 @@ def create_app():
                         "exit_price": xp,
                         "profit": profit,
                     })
-                
+
                 # get current balance for header display
                 cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
                 row = cur.fetchone()
@@ -219,7 +242,11 @@ def create_app():
         finally:
             conn.close()
 
-        return render_template("trades.html", trades=trades, current_balance=current_balance)
+        # pagination metadata
+        total_pages = (total + per_page - 1) // per_page if per_page else 1
+
+        return render_template("trades.html", trades=trades, current_balance=current_balance,
+                               page=page, per_page=per_page, total=total, total_pages=total_pages)
 
     return app
 
