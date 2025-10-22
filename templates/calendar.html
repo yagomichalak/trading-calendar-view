@@ -1,0 +1,44 @@
+
+{% extends "base.html" %}
+{% block content %}
+  <h2>{{ first_day.strftime('%B %Y') }}</h2>
+  <div class="dow">Mon</div>
+  <div class="dow">Tue</div>
+  <div class="dow">Wed</div>
+  <div class="dow">Thu</div>
+  <div class="dow">Fri</div>
+  <div class="dow">Sat</div>
+  <div class="dow">Sun</div>
+
+  <div class="calendar">
+    {% for cell in cells %}
+      <div class="card {% if not cell.in_month %}dim{% endif %}">
+        <div class="date">{{ cell.date.strftime('%d %a') }}</div>
+        {% if cell.day_pl is not none %}
+          <div class="pl {% if cell.day_pl >= 0 %}positive{% else %}negative{% endif %}">
+            {{ '%+.2f'|format(cell.day_pl) }}
+          </div>
+        {% else %}
+          <div class="subtle">No trades</div>
+        {% endif %}
+        {% if cell.week_pl is not none %}
+          <div class="weekpl">Week total: {{ '%+.2f'|format(cell.week_pl) }}</div>
+        {% endif %}
+
+        <details style="margin-top:8px;">
+          <summary>Add trade</summary>
+          <form action="{{ url_for('create_trade') }}" method="post">
+            <input type="hidden" name="trade_date" value="{{ cell.date.isoformat() }}"/>
+            <input name="symbol" placeholder="SYM" style="width:72px"/>
+            <input name="position_size" type="number" step="1" placeholder="Qty" style="width:80px"/>
+            <input name="entry_price" type="number" step="0.01" placeholder="Entry" style="width:90px"/>
+            <input name="exit_price" type="number" step="0.01" placeholder="Exit" style="width:90px"/>
+            <button type="submit">Save</button>
+          </form>
+          <div class="subtle">Only trades are entered manually; balances update via triggers.</div>
+        </details>
+      </div>
+    {% endfor %}
+  </div>
+
+{% endblock %}

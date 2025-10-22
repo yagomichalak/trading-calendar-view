@@ -1,0 +1,53 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Trading Calendar</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#0b0f14; color:#eaeef3;}
+      header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:#0f1620; border-bottom:1px solid #1f2a38;}
+      a { color:#7bdcff; text-decoration:none; }
+      .container { padding: 20px; max-width: 1100px; margin: 0 auto; }
+      .calendar { display:grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+      .dow { text-align:center; opacity:0.7; font-size:12px; margin-bottom:6px; }
+      .card { background:#121a26; border:1px solid #1f2a38; border-radius:12px; padding:10px; min-height:90px; position:relative; }
+      .card.dim { opacity: 0.45; }
+      .date { font-size:12px; opacity:0.8; }
+      .pl { font-weight:700; margin-top:8px; }
+      .pl.positive { color:#66e08a; }
+      .pl.negative { color:#ff7a7a; }
+      .weekpl { position:absolute; bottom:8px; right:10px; font-size:12px; opacity:0.8; }
+      form { display:flex; gap:8px; flex-wrap: wrap; }
+      input[type="text"], input[type="number"], input[type="date"] {
+        background:#0f1620; border:1px solid #2b3a52; color:#eaeef3; border-radius:8px; padding:8px;
+      }
+      button { background:#1b9aaa; border:0; color:white; padding:10px 14px; border-radius:8px; cursor:pointer; }
+      .flash { margin: 10px 0; padding: 10px; border-radius: 8px; }
+      .flash.ok { background:#10351e; border:1px solid #245f39; }
+      .flash.error { background:#3b1212; border:1px solid #6a1b1b; }
+      .subtle { opacity:0.7; font-size:12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div><strong>Trading Calendar</strong></div>
+      <nav>
+        <a href="{{ url_for('calendar_view', year=prev_year, month=prev_month) }}">&larr; Prev</a>
+        &nbsp;|&nbsp;
+        <a href="{{ url_for('calendar_view', year=next_year, month=next_month) }}">Next &rarr;</a>
+      </nav>
+    </header>
+    <div class="container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="flash {{cat}}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+  </body>
+</html>

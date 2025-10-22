@@ -1,0 +1,4 @@
+Flask==3.0.3
+pymysql==1.1.1
+python-dotenv==1.0.1
+tzdata==2025.2
