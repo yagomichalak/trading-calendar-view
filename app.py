@@ -216,7 +216,7 @@ def create_app():
                 total = int(cnt_row["cnt"]) if cnt_row and cnt_row.get("cnt") is not None else 0
 
                 # fetch page of trades
-                cur.execute("SELECT trade_date, symbol, position_size, entry_price, exit_price FROM trades ORDER BY trade_date DESC, id DESC LIMIT %s OFFSET %s", (per_page, offset))
+                cur.execute("SELECT id, trade_date, symbol, position_size, entry_price, exit_price FROM trades ORDER BY trade_date DESC, id DESC LIMIT %s OFFSET %s", (per_page, offset))
                 rows = cur.fetchall()
                 for r in rows:
                     # ensure floats
@@ -226,6 +226,7 @@ def create_app():
                     # profit calculation: (exit_price - entry_price) * position_size
                     profit = (xp - ep) * ps
                     trades.append({
+                        "id": r["id"],
                         "trade_date": r["trade_date"],
                         "symbol": r["symbol"],
                         "position_size": ps,
@@ -247,6 +248,72 @@ def create_app():
 
         return render_template("trades.html", trades=trades, current_balance=current_balance,
                                page=page, per_page=per_page, total=total, total_pages=total_pages)
+
+    @app.route("/trades/<int:trade_id>", methods=["GET"])
+    def trade_detail(trade_id):
+        """Display detailed view of a trade and its linked day data."""
+        conn = get_db()
+        trade = None
+        day = None
+        try:
+            with conn.cursor() as cur:
+                # get trade with all fields including stop_loss and take_profit
+                cur.execute("""
+                    SELECT id, trade_date, symbol, position_size, entry_price, exit_price, 
+                           stop_loss, take_profit, day_id
+                    FROM trades 
+                    WHERE id = %s
+                """, (trade_id,))
+                row = cur.fetchone()
+                if not row:
+                    flash("Trade not found.", "error")
+                    return redirect(url_for("trades_view"))
+                
+                # compute profit
+                ps = float(row["position_size"]) if row.get("position_size") is not None else 0.0
+                ep = float(row["entry_price"]) if row.get("entry_price") is not None else 0.0
+                xp = float(row["exit_price"]) if row.get("exit_price") is not None else 0.0
+                sl = float(row["stop_loss"]) if row.get("stop_loss") is not None else None
+                tp = float(row["take_profit"]) if row.get("take_profit") is not None else None
+                profit = (xp - ep) * ps
+                
+                trade = {
+                    "id": row["id"],
+                    "trade_date": row["trade_date"],
+                    "symbol": row["symbol"],
+                    "position_size": ps,
+                    "entry_price": ep,
+                    "exit_price": xp,
+                    "stop_loss": sl,
+                    "take_profit": tp,
+                    "profit": profit,
+                }
+                
+                # get linked day data if day_id exists
+                if row.get("day_id"):
+                    cur.execute("""
+                        SELECT date, entry_balance, day_pl, current_balance, risk10
+                        FROM days
+                        WHERE id = %s
+                    """, (row["day_id"],))
+                    day_row = cur.fetchone()
+                    if day_row:
+                        day = {
+                            "date": day_row["date"],
+                            "entry_balance": float(day_row["entry_balance"]),
+                            "day_pl": float(day_row["day_pl"]),
+                            "current_balance": float(day_row["current_balance"]),
+                            "risk10": day_row["risk10"],
+                        }
+                
+                # get current_balance for header
+                cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
+                bal_row = cur.fetchone()
+                current_balance = float(bal_row["current_balance"]) if bal_row and bal_row.get("current_balance") else 0
+        finally:
+            conn.close()
+            
+        return render_template("trade_detail.html", trade=trade, day=day, current_balance=current_balance)
 
     return app
 

@@ -28,7 +28,7 @@
       <tbody>
         {% for t in trades %}
           <tr class="card" style="background:transparent; border:0;">
-            <td style="padding:8px">{{ t.trade_date }}</td>
+            <td style="padding:8px"><a href="{{ url_for('trade_detail', trade_id=t.id) }}">{{ t.trade_date }}</a></td>
             <td style="padding:8px">{{ t.symbol }}</td>
             <td style="padding:8px; text-align:right">{{ '%.2f'|format(t.position_size) }}</td>
             <td style="padding:8px; text-align:right">{{ '$%.2f'|format(t.entry_price) }}</td>
