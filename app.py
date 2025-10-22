@@ -27,6 +27,20 @@ def create_app():
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")
     app.config["TZ"] = os.getenv("TZ", "America/Sao_Paulo")
 
+    @app.context_processor
+    def inject_current_balance():
+        current_balance = None
+        conn = get_db()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
+                row = cur.fetchone()
+                if row and row.get("current_balance") is not None:
+                    current_balance = float(row["current_balance"])
+        finally:
+            conn.close()
+        return dict(current_balance=current_balance)
+
     @app.cli.command("init-db")
     def init_db():
         """Initialize the MySQL schema/triggers/views from ./tradingview_structure.sql"""
@@ -87,11 +101,6 @@ def create_app():
                 """, (start_grid, end_grid))
                 weeks = cur.fetchall()
                 # --- CHANGES END
-
-                cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
-                row = cur.fetchone()
-                if row and row.get("current_balance") is not None:
-                    current_balance = float(row["current_balance"])
         finally:
             conn.close()
 
@@ -155,8 +164,7 @@ def create_app():
                                cells=cells,
                                first_day=first_day,
                                prev_year=prev_month.year, prev_month=prev_month.month,
-                               next_year=next_month_x.year, next_month=next_month_x.month,
-                               current_balance=current_balance)
+                               next_year=next_month_x.year, next_month=next_month_x.month)
 
     @app.route("/trades/new", methods=["POST"])
     def create_trade():
@@ -239,20 +247,14 @@ def create_app():
                         "exit_price": xp,
                         "profit": profit,
                     })
-
-                # get current balance for header display
-                cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
-                row = cur.fetchone()
-                if row and row.get("current_balance") is not None:
-                    current_balance = float(row["current_balance"])
         finally:
             conn.close()
 
         # pagination metadata
         total_pages = (total + per_page - 1) // per_page if per_page else 1
 
-        return render_template("trades.html", trades=trades, current_balance=current_balance,
-                               page=page, per_page=per_page, total=total, total_pages=total_pages)
+        return render_template("trades.html", trades=trades, page=page,
+                               per_page=per_page, total=total, total_pages=total_pages)
 
     @app.route("/trades/<int:trade_id>", methods=["GET"])
     def trade_detail(trade_id):
@@ -310,15 +312,10 @@ def create_app():
                             "current_balance": float(day_row["current_balance"]),
                             "risk10": day_row["risk10"],
                         }
-                
-                # get current_balance for header
-                cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
-                bal_row = cur.fetchone()
-                current_balance = float(bal_row["current_balance"]) if bal_row and bal_row.get("current_balance") else 0
         finally:
             conn.close()
             
-        return render_template("trade_detail.html", trade=trade, day=day, current_balance=current_balance)
+        return render_template("trade_detail.html", trade=trade, day=day)
 
     return app
 

@@ -43,10 +43,11 @@
         {% endif %}
       </div>
       <nav>
+        {% if prev_year is defined and prev_month is defined and next_year is defined and next_month is defined %}
         <a href="{{ url_for('calendar_view', year=prev_year, month=prev_month) }}">&larr; Prev</a>
         &nbsp;|&nbsp;
         <a href="{{ url_for('calendar_view', year=next_year, month=next_month) }}">Next &rarr;</a>
-        &nbsp;|&nbsp;
+        {% endif %}
         <a href="{{ url_for('trades_view') }}">Trades</a>
       </nav>
     </header>
