@@ -24,9 +24,7 @@
         {% else %}
           <div class="subtle">Daily risk: —</div>
         {% endif %}
-        {% if cell.week_pl is not none %}
-          <div class="weekpl">Week total: {{ '%+.2f$'|format(cell.week_pl) }}</div>
-        {% endif %}
+
 
         <details style="margin-top:8px;">
           <summary>Add trade</summary>
@@ -40,6 +38,9 @@
           </form>
           <div class="subtle">Only trades are entered manually; balances update via triggers.</div>
         </details>
+        {% if cell.week_pl is not none %}
+          <div class="weekpl">Week total: {{ '%+.2f$'|format(cell.week_pl) }}</div>
+        {% endif %}
       </div>
     {% endfor %}
   </div>
