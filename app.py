@@ -399,6 +399,7 @@ def create_app():
                 deleted_trade_date = row.get("trade_date")
 
                 cur.execute("DELETE FROM trades WHERE id = %s", (trade_id,))
+                cur.execute("DELETE FROM days WHERE trade_id = %s AND date = %s", (trade_id, deleted_trade_date))
                 if cur.rowcount == 0:
                     flash("Trade not found.", "error")
                 else:
