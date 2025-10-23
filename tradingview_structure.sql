@@ -69,8 +69,6 @@ CREATE INDEX idx_days_week ON days (week_id);
 -- ⚙️ 2️⃣ TRIGGERS (MySQL)
 -- ========================================
 
-DELIMITER $$
-
 -- BEFORE INSERT on days:
 --   • ensure week exists for NEW.date (Mon..Sun)
 --   • set NEW.week_id
@@ -153,8 +151,8 @@ BEGIN
     d.day_pl = COALESCE((SELECT SUM(t.profit) FROM trades t WHERE t.day_id = NEW.day_id), 0),
     d.current_balance = d.entry_balance
                         + COALESCE((SELECT SUM(t.profit) FROM trades t WHERE t.day_id = NEW.day_id), 0),
-    d.risk10 = ROUND(d.entry_balance * 0.10, 2)
-    d.trade_id = t.id
+    d.risk10 = ROUND(d.entry_balance * 0.10, 2),
+    d.trade_id = NEW.id
   WHERE d.id = NEW.day_id;
 
   -- also roll week_pl
@@ -201,10 +199,6 @@ BEGIN
   SET w.week_pl = COALESCE((SELECT SUM(d2.day_pl) FROM days d2 WHERE d2.week_id = w.id), 0)
   WHERE d.id = OLD.day_id;
 END$$
-
-DELIMITER;
-
-DELIMITER $$
 
 DROP TRIGGER IF EXISTS trg_bi_days_fill_week_and_balances $$
 
@@ -254,12 +248,7 @@ BEGIN
   SET NEW.risk10          = ROUND(v_prev_bal * 0.10, 2);
 END $$
 
-DELIMITER;
-
 DROP TRIGGER IF EXISTS trg_ai_trades_set_day_trade;
-
-DELIMITER /
-/
 
 CREATE TRIGGER trg_ai_trades_set_day_trade
 AFTER INSERT ON trades
@@ -270,8 +259,4 @@ BEGIN
       SET trade_id = NEW.id
     WHERE id = NEW.day_id;
   END IF;
-END
-/
-/
-
-DELIMITER;
+END$$
