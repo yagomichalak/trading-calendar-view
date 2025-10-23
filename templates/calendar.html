@@ -12,18 +12,17 @@
             {{ '%+.2f$'|format(cell.day_pl) }}
             <br>
           </div>
-        {% else %}
-          <div class="subtle">No trades</div>
-        {% endif %}
-
-          {% if cell.daily_risk %}
-          <div class="pl risk">
-              {{ '⚠️ %.2f$'|format(cell.daily_risk) }}
-            <br>
-          </div>
-        {% else %}
-          <div class="subtle">Daily risk: —</div>
-        {% endif %}
+          {% else %}
+          <div class="subtle">{% if cell.in_month %}No trades{% else %}...{% endif %}</div>
+          {% endif %}
+          {% if cell.daily_risk and cell.in_month %}
+            <div class="pl risk">
+                {{ '⚠️ %.2f$'|format(cell.daily_risk) }}
+              <br>
+            </div>
+          {% else %}
+            <div class="subtle">Daily risk: —</div>
+          {% endif %}
 
 
   <button class="add-trade-btn" onclick="openTradeModal('{{ cell.date.isoformat() }}')" title="Add trade" style="position:absolute;top:8px;right:8px;padding:2px 8px;font-size:18px;line-height:1;border-radius:50%;border:none;background:var(--cell-bg,#121a26);cursor:pointer;">+</button>
