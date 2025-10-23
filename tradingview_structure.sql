@@ -81,13 +81,14 @@ BEFORE INSERT ON days
 FOR EACH ROW
 BEGIN
   DECLARE v_week_id INT;
-  DECLARE v_monday  DATE;
   DECLARE v_sunday  DATE;
+  DECLARE v_saturday DATE;
   DECLARE v_prev_bal DECIMAL(12,2);
 
-  -- week bounds (Mon..Sun)
-  SET v_monday = DATE_SUB(NEW.`date`, INTERVAL WEEKDAY(NEW.`date`) DAY);
-  SET v_sunday = DATE_ADD(v_monday, INTERVAL 6 DAY);
+  -- week bounds (Sun..Sat)
+  -- DAYOFWEEK returns 1=Sunday..7=Saturday, so subtract (DAYOFWEEK-1) days to get Sunday
+  SET v_sunday = DATE_SUB(NEW.`date`, INTERVAL (DAYOFWEEK(NEW.`date`) - 1) DAY);
+  SET v_saturday = DATE_ADD(v_sunday, INTERVAL 6 DAY);
 
   SELECT id INTO v_week_id
   FROM weeks
@@ -95,8 +96,8 @@ BEGIN
   LIMIT 1;
 
   IF v_week_id IS NULL THEN
-    INSERT INTO weeks (start_date, end_date, starting_balance)
-    VALUES (v_monday, v_sunday, 2000.00);
+  INSERT INTO weeks (start_date, end_date, starting_balance)
+  VALUES (v_sunday, v_saturday, 2000.00);
     SET v_week_id = LAST_INSERT_ID();
   END IF;
 
@@ -212,13 +213,13 @@ BEFORE INSERT ON days
 FOR EACH ROW
 BEGIN
   DECLARE v_week_id INT;
-  DECLARE v_monday  DATE;
   DECLARE v_sunday  DATE;
+  DECLARE v_saturday DATE;
   DECLARE v_prev_bal DECIMAL(12,2);
 
-  -- Monday..Sunday window for NEW.date
-  SET v_monday = DATE_SUB(NEW.`date`, INTERVAL WEEKDAY(NEW.`date`) DAY);
-  SET v_sunday = DATE_ADD(v_monday, INTERVAL 6 DAY);
+  -- Sunday..Saturday window for NEW.date
+  SET v_sunday = DATE_SUB(NEW.`date`, INTERVAL (DAYOFWEEK(NEW.`date`) - 1) DAY);
+  SET v_saturday = DATE_ADD(v_sunday, INTERVAL 6 DAY);
 
   -- find or create week
   SELECT id INTO v_week_id
@@ -227,8 +228,8 @@ BEGIN
   LIMIT 1;
 
   IF v_week_id IS NULL THEN
-    INSERT INTO weeks (start_date, end_date, starting_balance, week_pl)
-    VALUES (v_monday, v_sunday, 2000.00, 0.00);
+  INSERT INTO weeks (start_date, end_date, starting_balance, week_pl)
+  VALUES (v_sunday, v_saturday, 2000.00, 0.00);
     SET v_week_id = LAST_INSERT_ID();
   END IF;
 
@@ -257,7 +258,8 @@ DELIMITER;
 
 DROP TRIGGER IF EXISTS trg_ai_trades_set_day_trade;
 
-DELIMITER / /
+DELIMITER /
+/
 
 CREATE TRIGGER trg_ai_trades_set_day_trade
 AFTER INSERT ON trades
@@ -268,6 +270,8 @@ BEGIN
       SET trade_id = NEW.id
     WHERE id = NEW.day_id;
   END IF;
-END//
+END
+/
+/
 
 DELIMITER;

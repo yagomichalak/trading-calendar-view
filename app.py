@@ -137,8 +137,10 @@ def create_app():
         next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
         last_day = next_month - timedelta(days=1)
 
-        # --- CHANGES START: compute the 6x7 GRID RANGE first
-        start_grid = first_day - timedelta(days=first_day.weekday())  # Monday of the grid
+        # --- CHANGES START: compute the 6x7 GRID RANGE first (start on Sunday)
+        # Python weekday(): Monday=0..Sunday=6. To get Sunday as start, compute days to subtract
+        days_to_sunday = (first_day.weekday() + 1) % 7
+        start_grid = first_day - timedelta(days=days_to_sunday)  # Sunday of the grid
         end_grid = start_grid + timedelta(days=41)  # inclusive last cell (6*7 - 1)
         # --- CHANGES END
 
@@ -191,10 +193,9 @@ def create_app():
             while d_iter <= end:
                 week_date_map[d_iter] = {"starting_balance": sb, "week_pl": wp}
                 d_iter += timedelta(days=1)
-            # compute saturday for optional display of week total on weekend
-            wd = w_start.weekday()
-            days_to_sat = (5 - wd) % 7
-            saturday = w_start + timedelta(days=days_to_sat)
+            # compute saturday for display of week total on Saturday cell
+            # w_start is the week's start_date (now Sunday); Saturday is +6 days
+            saturday = w_start + timedelta(days=6)
             if start_grid <= saturday <= end_grid:
                 saturday_weekpl[saturday] = wp
 
@@ -209,8 +210,8 @@ def create_app():
                 "date": d,
                 "in_month": d.month == month,
                 "day_pl": day_pl["day_pl"] if day_pl else None,
-                # show week total only on weekend cells (Saturday/Sunday) when available
-                "week_pl": saturday_weekpl.get(d) if d.weekday() >= 5 else None,
+                # show week total only on Saturday cell when available
+                "week_pl": saturday_weekpl.get(d) if d.weekday() == 5 else None,
                 "risk10": day_pl["risk10"] if day_pl else None,
                 # calculate daily risk from the week data: ((starting_balance + week_pl) * default_risk) / 100
                 "daily_risk": ((weekinfo["starting_balance"] + weekinfo["week_pl"]) * default_risk) / 100 if weekinfo else None,
