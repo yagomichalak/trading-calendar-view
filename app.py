@@ -391,28 +391,44 @@ def create_app():
         affected_week_ids = set()
         try:
             with conn.cursor() as cur:
-                # capture the trade_date and any linked day rows before deletion
+                # fetch trade with day_id and trade_date
                 cur.execute("SELECT trade_date, day_id FROM trades WHERE id = %s", (trade_id,))
                 row = cur.fetchone()
                 if not row:
                     flash("Trade not found.", "error")
                     return redirect(request.referrer or url_for('trades_view'))
+
                 deleted_trade_date = row.get("trade_date")
+                day_id = row.get("day_id")
 
-                # find any days tied to this trade and capture their week_id values
-                cur.execute("SELECT id, week_id FROM days WHERE trade_id = %s AND date = %s", (trade_id, deleted_trade_date))
-                day_rows = cur.fetchall()
-                for dr in day_rows:
-                    if dr.get("week_id") is not None:
-                        affected_week_ids.add(dr.get("week_id"))
+                # capture the week's id for the day (if any) so we can check later
+                if day_id is not None:
+                    cur.execute("SELECT week_id FROM days WHERE id = %s", (day_id,))
+                    drow = cur.fetchone()
+                    if drow and drow.get("week_id") is not None:
+                        affected_week_ids.add(drow.get("week_id"))
 
-                # delete the trade and its day row(s)
+                # delete the trade
                 cur.execute("DELETE FROM trades WHERE id = %s", (trade_id,))
-                cur.execute("DELETE FROM days WHERE trade_id = %s AND date = %s", (trade_id, deleted_trade_date))
                 if cur.rowcount == 0:
                     flash("Trade not found.", "error")
-                else:
-                    flash("Trade deleted.", "ok")
+                    # nothing deleted, nothing to do
+                    return redirect(request.referrer or url_for('trades_view'))
+
+                # Now check if the day still has any trades attached. Only delete day when no trades remain for that day.
+                if day_id is not None:
+                    cur.execute("SELECT COUNT(*) as cnt FROM trades WHERE day_id = %s", (day_id,))
+                    cnt_row = cur.fetchone()
+                    remaining = int(cnt_row["cnt"]) if cnt_row and cnt_row.get("cnt") is not None else 0
+                    if remaining == 0:
+                        # no trades remain for the day -> delete the day
+                        cur.execute("DELETE FROM days WHERE id = %s", (day_id,))
+                        # if day had a week, we'll check below whether that week became empty
+                        # capture week id again (in case it changed)
+                        cur.execute("SELECT week_id FROM days WHERE id = %s", (day_id,))
+                        # the row will be gone, so nothing to fetch here; we use affected_week_ids captured earlier
+
+                flash("Trade deleted.", "ok")
 
                 # for each affected week, if it now has no days, delete the week
                 for w_id in list(affected_week_ids):
