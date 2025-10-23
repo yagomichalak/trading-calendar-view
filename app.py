@@ -506,7 +506,7 @@ def create_app():
                     }
                     return render_template('trade_edit.html', trade=trade)
 
-                # POST: apply changes
+                # POST: apply changes (support moving trade to a different date)
                 symbol = request.form.get("symbol", "").strip().upper()
                 position_size = request.form.get("position_size")
                 entry_price = request.form.get("entry_price")
@@ -522,9 +522,28 @@ def create_app():
                     ep_f = float(entry_price)
                     xp_f = float(exit_price)
 
+                    # fetch existing trade to know its current day_id/trade_date
+                    cur.execute("SELECT day_id, trade_date FROM trades WHERE id = %s", (trade_id,))
+                    old = cur.fetchone()
+                    if not old:
+                        flash("Trade not found.", "error")
+                        return redirect(request.referrer or url_for('trades_view'))
+
+                    old_day_id = old.get("day_id")
+
+                    # ensure a day exists for the new trade_date (trigger will create week if needed)
+                    cur.execute("SELECT id FROM days WHERE `date` = %s LIMIT 1", (trade_date,))
+                    nd = cur.fetchone()
+                    if nd:
+                        new_day_id = nd.get("id")
+                    else:
+                        cur.execute("INSERT INTO days(`date`) VALUES (%s)", (trade_date,))
+                        new_day_id = cur.lastrowid
+
+                    # perform the trade update including moving to new day_id
                     cur.execute("""
                         UPDATE trades
-                        SET symbol = %s, position_size = %s, entry_price = %s, exit_price = %s, trade_date = %s
+                        SET symbol = %s, position_size = %s, entry_price = %s, exit_price = %s, trade_date = %s, day_id = %s
                         WHERE id = %s
                     """, (
                         symbol,
@@ -532,8 +551,31 @@ def create_app():
                         ep_f,
                         xp_f,
                         trade_date,
+                        new_day_id,
                         trade_id
                     ))
+
+                    # If we moved the trade to another day, consider cleaning the old day/week
+                    if old_day_id is not None and old_day_id != new_day_id:
+                        # capture old week's id before possibly deleting the day
+                        cur.execute("SELECT week_id FROM days WHERE id = %s", (old_day_id,))
+                        old_drow = cur.fetchone()
+                        old_week_id = old_drow.get("week_id") if old_drow else None
+
+                        # are there any trades left for the old day?
+                        cur.execute("SELECT COUNT(*) as cnt FROM trades WHERE day_id = %s", (old_day_id,))
+                        cnt_row = cur.fetchone()
+                        remaining = int(cnt_row["cnt"]) if cnt_row and cnt_row.get("cnt") is not None else 0
+                        if remaining == 0:
+                            cur.execute("DELETE FROM days WHERE id = %s", (old_day_id,))
+                            # if the old week now has no days, delete it
+                            if old_week_id is not None:
+                                cur.execute("SELECT COUNT(*) as cnt FROM days WHERE week_id = %s", (old_week_id,))
+                                wcnt = cur.fetchone()
+                                wcnt_i = int(wcnt["cnt"]) if wcnt and wcnt.get("cnt") is not None else 0
+                                if wcnt_i == 0:
+                                    cur.execute("DELETE FROM weeks WHERE id = %s", (old_week_id,))
+
                     flash("Trade updated.", "ok")
                 except Exception as e:
                     flash(f"DB error: {e}", "error")
