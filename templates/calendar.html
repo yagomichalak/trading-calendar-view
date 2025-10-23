@@ -1,8 +1,56 @@
 
 {% extends "base.html" %}
 {% block content %}
-  <h2>{{ first_day.strftime('%B %Y') }}</h2>
 
+<div class="card" 
+     style="
+       margin: 0 auto 32px auto; 
+       padding: 24px 32px; 
+       max-width: 480px; 
+       background-color: #0e1525; 
+       border: 1px solid #1e2b40; 
+       border-radius: 16px; 
+       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+     ">
+  <form method="post" action="{{ url_for('update_starting_balance') }}" 
+        style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
+        
+      <label class="subtle" style="font-size: 14px; color: #b0c7e1;">Starting Balance</label>
+      <input type="number" name="starting_balance" required step="1" 
+             style="
+               width: 100%;
+               max-width: 240px;
+               padding: 10px 14px;
+               border: 1px solid #2b3b52;
+               border-radius: 8px;
+               background-color: #101a2b;
+               color: #dce6f3;
+               font-size: 15px;
+               text-align: center;
+             "
+             value="{{starting_balance}}">
+             
+      <button type="submit" 
+              style="
+                background-color: #14b8a6;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 24px;
+                color: #fff;
+                font-weight: 600;
+                cursor: pointer;
+                font-size: 15px;
+                transition: all 0.25s ease;
+              "
+              onmouseover="this.style.backgroundColor='#0fa294'"
+              onmouseout="this.style.backgroundColor='#14b8a6'">
+        Update
+      </button>
+  </form>
+</div>
+
+
+  <h2>{{ first_day.strftime('%B %Y') }}</h2>
   <div class="calendar">
     {% for cell in cells %}
       <div class="card {% if not cell.in_month %}dim{% endif %}">

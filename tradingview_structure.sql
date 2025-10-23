@@ -25,6 +25,11 @@ DROP TABLE IF EXISTS weeks;
 -- 📆 TABLES
 -- ========================================
 
+CREATE TABLE TraderInfo (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    starting_balance DECIMAL(12, 2) NOT NULL DEFAULT 2000.00
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE weeks (
     id INT PRIMARY KEY AUTO_INCREMENT,
     start_date DATE NOT NULL,
@@ -260,3 +265,5 @@ BEGIN
     WHERE id = NEW.day_id;
   END IF;
 END$$
+
+INSERT INTO TraderInfo (starting_balance) VALUES (2000.00);

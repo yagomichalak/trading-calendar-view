@@ -27,19 +27,29 @@ def create_app():
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")
     app.config["TZ"] = os.getenv("TZ", "America/Sao_Paulo")
 
-    @app.context_processor
-    def inject_current_balance():
+    def _get_current_balance(starting_balance: bool = False):
         current_balance = None
         conn = get_db()
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
-                row = cur.fetchone()
-                if row and row.get("current_balance") is not None:
-                    current_balance = float(row["current_balance"])
+                if not starting_balance:
+                    cur.execute("SELECT current_balance FROM days ORDER BY date DESC LIMIT 1")
+                    row = cur.fetchone()
+                    if row and row.get("current_balance") is not None:
+                        return float(row["current_balance"])
+
+                # fallback to TraderInfo.starting_balance
+                cur.execute("SELECT starting_balance FROM TraderInfo LIMIT 1")
+                trow = cur.fetchone()
+                if trow and trow.get("starting_balance") is not None:
+                    return float(trow["starting_balance"])
         finally:
             conn.close()
-        return dict(current_balance=current_balance)
+        return current_balance
+
+    @app.context_processor
+    def inject_current_balance():
+        return {"current_balance": _get_current_balance()}
 
     def recompute_from_date(start_date):
         """Recompute entry_balance, day_pl, current_balance and risk10 for all days from start_date onwards,
@@ -249,7 +259,8 @@ def create_app():
                                cells=cells,
                                first_day=first_day,
                                prev_year=prev_month.year, prev_month=prev_month.month,
-                               next_year=next_month_x.year, next_month=next_month_x.month)
+                               next_year=next_month_x.year, next_month=next_month_x.month,
+                               starting_balance=_get_current_balance(starting_balance=True))
 
     @app.route("/trades/new", methods=["POST"])
     def create_trade():
@@ -259,6 +270,7 @@ def create_app():
         entry_price = request.form.get("entry_price")
         exit_price = request.form.get("exit_price")
         trade_date = request.form.get("trade_date")
+        current_balance = _get_current_balance()
 
         if not (symbol and position_size and entry_price and exit_price and trade_date):
             flash("All fields are required.", "error")
@@ -271,6 +283,14 @@ def create_app():
                     INSERT INTO trades (symbol, position_size, entry_price, exit_price, trade_date)
                     VALUES (%s, %s, %s, %s, %s)
                 """, (symbol, float(position_size), float(entry_price), float(exit_price), trade_date))
+
+                # Update weeks.starting_balance only if weeks table has exactly one entry
+                cur.execute("SELECT COUNT(*) AS cnt FROM weeks")
+                row = cur.fetchone()
+                if row and int(row["cnt"]) == 1:
+                    cur.execute("UPDATE weeks SET starting_balance = %s", (current_balance,))
+                    print(f"✅ Updated only week starting_balance to {current_balance}")
+
             flash(f"Trade {symbol} added for {trade_date}.", "ok")
         except Exception as e:
             flash(f"DB error: {e}", "error")
@@ -592,6 +612,31 @@ def create_app():
                 print("Failed to recompute after editing trade")
 
             return redirect(url_for('trades_view'))
+
+        return app
+
+    @app.route("/balance/edit", methods=["POST"])
+    def update_starting_balance():
+        """Apply update for the starting balance."""
+
+        conn = get_db()
+        try:
+            with conn.cursor() as cur:
+                # POST: apply changes (support moving trade to a different date)
+                starting_balance = request.form.get("starting_balance", 2000).strip().upper()
+
+                try:
+                    sb_value = float(starting_balance)
+                    # update existing starting balance
+                    cur.execute("UPDATE TraderInfo SET starting_balance = %s", (sb_value,))
+
+                    flash("Starting balance updated.", "ok")
+                except Exception as e:
+                    flash(f"DB error: {e}", "error")
+        finally:
+            conn.close()
+
+        return redirect(url_for('calendar_view'))
 
     return app
 
