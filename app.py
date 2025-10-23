@@ -388,9 +388,10 @@ def create_app():
         """Delete a trade by id and redirect back to the trades list or referrer."""
         conn = get_db()
         deleted_trade_date = None
+        affected_week_ids = set()
         try:
             with conn.cursor() as cur:
-                # capture the trade_date before deletion so we know from which date to recompute
+                # capture the trade_date and any linked day rows before deletion
                 cur.execute("SELECT trade_date, day_id FROM trades WHERE id = %s", (trade_id,))
                 row = cur.fetchone()
                 if not row:
@@ -398,12 +399,28 @@ def create_app():
                     return redirect(request.referrer or url_for('trades_view'))
                 deleted_trade_date = row.get("trade_date")
 
+                # find any days tied to this trade and capture their week_id values
+                cur.execute("SELECT id, week_id FROM days WHERE trade_id = %s AND date = %s", (trade_id, deleted_trade_date))
+                day_rows = cur.fetchall()
+                for dr in day_rows:
+                    if dr.get("week_id") is not None:
+                        affected_week_ids.add(dr.get("week_id"))
+
+                # delete the trade and its day row(s)
                 cur.execute("DELETE FROM trades WHERE id = %s", (trade_id,))
                 cur.execute("DELETE FROM days WHERE trade_id = %s AND date = %s", (trade_id, deleted_trade_date))
                 if cur.rowcount == 0:
                     flash("Trade not found.", "error")
                 else:
                     flash("Trade deleted.", "ok")
+
+                # for each affected week, if it now has no days, delete the week
+                for w_id in list(affected_week_ids):
+                    cur.execute("SELECT COUNT(*) as cnt FROM days WHERE week_id = %s", (w_id,))
+                    cnt_row = cur.fetchone()
+                    cnt = int(cnt_row["cnt"]) if cnt_row and cnt_row.get("cnt") is not None else 0
+                    if cnt == 0:
+                        cur.execute("DELETE FROM weeks WHERE id = %s", (w_id,))
         except Exception as e:
             flash(f"DB error: {e}", "error")
         finally:
