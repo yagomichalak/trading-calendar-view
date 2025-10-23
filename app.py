@@ -424,6 +424,7 @@ def create_app():
     def edit_trade(trade_id):
         """Show edit form (GET) and apply updates (POST) for a trade."""
         conn = get_db()
+        trade_date = None
         try:
             with conn.cursor() as cur:
                 # GET: render form with current values
@@ -483,9 +484,12 @@ def create_app():
         finally:
             conn.close()
 
+        # Only after a POST do we recompute and redirect. GET already returned above.
+        if request.method == "POST":
             # Recompute balances from the trade date so subsequent days are updated
             try:
-                recompute_from_date(trade_date)
+                if trade_date:
+                    recompute_from_date(trade_date)
             except Exception:
                 print("Failed to recompute after editing trade")
 
