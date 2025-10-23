@@ -116,9 +116,31 @@ def create_app():
         conn = get_db()
         try:
             with conn.cursor() as cur:
-                statements = [s.strip() for s in sql.split(';') if s.strip()]
+                # Handle DELIMITER blocks for triggers/routines
+                statements = []
+                delimiter = '$$'
+                buffer = ''
+                for line in sql.splitlines():
+                    lstripped = line.strip()
+                    if lstripped.upper().startswith('DELIMITER'):
+                        delimiter = lstripped.split()[1]
+                        continue
+                    buffer += line + '\n'
+                    if buffer.rstrip().endswith(delimiter):
+                        # Remove delimiter from end
+                        statement = buffer.rstrip()[:-len(delimiter)].strip()
+                        if statement:
+                            statements.append(statement)
+                        buffer = ''
+                # Add any trailing statement
+                if buffer.strip():
+                    statements.append(buffer.strip())
                 for stmt in statements:
-                    cur.execute(stmt)
+                    try:
+                        cur.execute(stmt)
+                    except Exception as e:
+                        print(f"Error executing SQL: {e}\nStatement: {stmt[:120]}...")
+                        raise
             print("✅ Database initialized successfully.")
         finally:
             conn.close()
