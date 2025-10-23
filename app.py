@@ -51,25 +51,92 @@ def create_app():
     def inject_current_balance():
         return {"current_balance": _get_current_balance()}
 
-    def recompute_from_date(start_date):
-        """Recompute entry_balance, day_pl, current_balance and risk10 for all days from start_date onwards,
-        and update affected weeks' week_pl. This is useful when a past trade is edited/deleted and later days
-        need their starting balances adjusted to reflect the change.
-        start_date may be a date or a string (YYYY-MM-DD).
+    def _recompute_week_starting_balances_from(start_week_start_date):
+        """
+        Recompute weeks.starting_balance forward from the week that starts at
+        'start_week_start_date'. Assumes weeks.week_pl is already up to date.
         """
         conn = get_db()
         try:
             with conn.cursor() as cur:
-                # Ensure start_date is a date-compatible value
-                cur.execute("SELECT id, date, week_id FROM days WHERE date >= %s ORDER BY date ASC", (start_date,))
+                # Find the earliest week >= start_week_start_date
+                cur.execute("""
+                    SELECT id, start_date, end_date, starting_balance, week_pl
+                    FROM weeks
+                    WHERE start_date >= %s
+                    ORDER BY start_date ASC
+                """, (start_week_start_date,))
+                weeks = cur.fetchall()
+
+                if not weeks:
+                    return  # nothing to do
+
+                # Determine the running starting balance before the first affected week
+                first_week = weeks[0]
+
+                # Look up the previous week (if any) to seed the running balance
+                cur.execute("""
+                    SELECT id, start_date, end_date, starting_balance, week_pl
+                    FROM weeks
+                    WHERE end_date < %s
+                    ORDER BY start_date DESC
+                    LIMIT 1
+                """, (first_week["start_date"],))
+                prev = cur.fetchone()
+
+                if prev:
+                    running_sb = float(prev["starting_balance"]) + float(prev["week_pl"])
+                else:
+                    # No previous week: use TraderInfo.starting_balance (canonical baseline)
+                    cur.execute("SELECT starting_balance FROM TraderInfo LIMIT 1")
+                    trow = cur.fetchone()
+                    running_sb = float(trow["starting_balance"]) if (trow and trow.get("starting_balance") is not None) else 0.0
+
+                # Now propagate forward
+                for i, w in enumerate(weeks):
+                    if i == 0:
+                        # First affected week starts from the running baseline we just computed
+                        new_sb = running_sb
+                    else:
+                        # For subsequent weeks, baseline is previous baseline + previous week_pl
+                        prev_w = weeks[i-1]
+                        new_sb = running_sb + float(prev_w["week_pl"])
+
+                    # Update DB if changed
+                    if abs(new_sb - float(w["starting_balance"])) > 1e-9:
+                        cur.execute("UPDATE weeks SET starting_balance = %s WHERE id = %s", (new_sb, w["id"]))
+
+                    running_sb = new_sb
+        finally:
+            conn.close()
+
+    def recompute_from_date(start_date):
+        """
+        Recompute entry_balance, day_pl, current_balance and risk10 for all days from start_date onwards,
+        update affected weeks' week_pl, and then propagate weeks.starting_balance forward so that:
+            week[i].starting_balance = week[i-1].starting_balance + week[i-1].week_pl
+        The first affected week is seeded by the previous week's (sb + week_pl), or TraderInfo.starting_balance
+        if no previous week exists.
+        start_date may be a date or a 'YYYY-MM-DD' string.
+        """
+        conn = get_db()
+        try:
+            with conn.cursor() as cur:
+                # 1) Get all days to recompute
+                cur.execute("""
+                    SELECT id, `date`, week_id
+                    FROM days
+                    WHERE `date` >= %s
+                    ORDER BY `date` ASC
+                """, (start_date,))
                 days = cur.fetchall()
 
-                # nothing to do if no days affected
                 if not days:
-                    return
+                    return  # nothing to do
 
                 affected_weeks = set()
 
+                # 2) Recompute each day's balances from trades + previous day/week
                 for d in days:
                     d_id = d["id"]
                     d_date = d["date"]
@@ -77,12 +144,19 @@ def create_app():
                     affected_weeks.add(w_id)
 
                     # previous balance: most recent current_balance for date < d_date
-                    cur.execute("SELECT current_balance FROM days WHERE date < %s ORDER BY date DESC LIMIT 1", (d_date,))
+                    cur.execute("""
+                        SELECT current_balance
+                        FROM days
+                        WHERE `date` < %s
+                        ORDER BY `date` DESC
+                        LIMIT 1
+                    """, (d_date,))
                     prev = cur.fetchone()
+
                     if prev and prev.get("current_balance") is not None:
                         prev_balance = float(prev["current_balance"])
                     else:
-                        # fallback to week's starting_balance
+                        # fallback to week's starting_balance, or 0 if none
                         prev_balance = 0.0
                         if w_id is not None:
                             cur.execute("SELECT starting_balance FROM weeks WHERE id = %s", (w_id,))
@@ -90,8 +164,8 @@ def create_app():
                             if wrow and wrow.get("starting_balance") is not None:
                                 prev_balance = float(wrow["starting_balance"])
 
-                    # recompute day_pl from trades for this day
-                    cur.execute("SELECT COALESCE(SUM(profit), 0) as s FROM trades WHERE day_id = %s", (d_id,))
+                    # sum day P/L from trades
+                    cur.execute("SELECT COALESCE(SUM(profit), 0) AS s FROM trades WHERE day_id = %s", (d_id,))
                     srow = cur.fetchone()
                     day_pl = float(srow["s"]) if srow and srow.get("s") is not None else 0.0
 
@@ -101,16 +175,83 @@ def create_app():
 
                     cur.execute("""
                         UPDATE days
-                        SET entry_balance = %s, day_pl = %s, current_balance = %s, risk10 = %s
+                        SET entry_balance = %s,
+                            day_pl = %s,
+                            current_balance = %s,
+                            risk10 = %s
                         WHERE id = %s
                     """, (entry_balance, day_pl, current_balance, risk10, d_id))
 
-                # Recompute week totals for affected weeks
+                # 3) Recompute week_pl for affected weeks
                 for w in affected_weeks:
                     if w is None:
                         continue
-                    cur.execute("UPDATE weeks SET week_pl = COALESCE((SELECT SUM(d2.day_pl) FROM days d2 WHERE d2.week_id = weeks.id), 0) WHERE id = %s", (w,))
-            # commit is enabled by autocommit in get_db
+                    cur.execute("""
+                        UPDATE weeks
+                        SET week_pl = COALESCE((
+                            SELECT SUM(d2.day_pl) FROM days d2 WHERE d2.week_id = weeks.id
+                        ), 0)
+                        WHERE id = %s
+                    """, (w,))
+
+                # 4) Propagate weeks.starting_balance forward from the earliest affected week
+                #    Find earliest affected week's start_date
+                ids = tuple(w for w in affected_weeks if w is not None)
+                min_start = None
+                if ids:
+                    # MySQL needs a tuple for IN; handle single-element case too
+                    in_clause = ids if len(ids) > 1 else (ids[0], ids[0])  # harmless duplicate to keep IN valid
+                    cur.execute(f"""
+                        SELECT MIN(start_date) AS min_start
+                        FROM weeks
+                        WHERE id IN ({",".join(["%s"] * len(in_clause))})
+                    """, in_clause)
+                    row = cur.fetchone()
+                    if row and row.get("min_start"):
+                        min_start = row["min_start"]
+
+                if min_start:
+                    # Seed running baseline using the week immediately before min_start, if any.
+                    cur.execute("""
+                        SELECT id, start_date, end_date, starting_balance, week_pl
+                        FROM weeks
+                        WHERE end_date < %s
+                        ORDER BY start_date DESC
+                        LIMIT 1
+                    """, (min_start,))
+                    prev_week = cur.fetchone()
+
+                    if prev_week:
+                        running_sb = float(prev_week["starting_balance"]) + float(prev_week["week_pl"])
+                    else:
+                        # No previous week => use TraderInfo as canonical baseline
+                        cur.execute("SELECT starting_balance FROM TraderInfo LIMIT 1")
+                        trow = cur.fetchone()
+                        running_sb = float(trow["starting_balance"]) if (trow and trow.get("starting_balance") is not None) else 0.0
+
+                    # Fetch all weeks from min_start onward and update their starting_balance
+                    cur.execute("""
+                        SELECT id, start_date, end_date, starting_balance, week_pl
+                        FROM weeks
+                        WHERE start_date >= %s
+                        ORDER BY start_date ASC
+                    """, (min_start,))
+                    forward_weeks = cur.fetchall()
+
+                    prev_week_pl = None
+                    for i, w in enumerate(forward_weeks):
+                        if i == 0:
+                            new_sb = running_sb
+                        else:
+                            new_sb = running_sb + (float(prev_week_pl) if prev_week_pl is not None else 0.0)
+
+                        if abs(new_sb - float(w["starting_balance"])) > 1e-9:
+                            cur.execute("UPDATE weeks SET starting_balance = %s WHERE id = %s", (new_sb, w["id"]))
+
+                        running_sb = new_sb
+                        prev_week_pl = float(w["week_pl"]) if w.get("week_pl") is not None else 0.0
+
+                # autocommit is on in get_db()
         finally:
             conn.close()
 
@@ -617,26 +758,64 @@ def create_app():
 
     @app.route("/balance/edit", methods=["POST"])
     def update_starting_balance():
-        """Apply update for the starting balance."""
-
+        """Update the TraderInfo starting balance and apply it to the oldest week."""
         conn = get_db()
+        oldest_week_date = None  # will store the oldest week's start_date
+
         try:
             with conn.cursor() as cur:
-                # POST: apply changes (support moving trade to a different date)
-                starting_balance = request.form.get("starting_balance", 2000).strip().upper()
-
+                # 1️ - Parse the new starting balance from the form
+                starting_balance_str = request.form.get("starting_balance", "2000").strip()
                 try:
-                    sb_value = float(starting_balance)
-                    # update existing starting balance
-                    cur.execute("UPDATE TraderInfo SET starting_balance = %s", (sb_value,))
+                    starting_balance = float(starting_balance_str)
+                except ValueError:
+                    flash("Invalid starting balance value.", "error")
+                    return redirect(url_for("calendar_view"))
 
-                    flash("Starting balance updated.", "ok")
-                except Exception as e:
-                    flash(f"DB error: {e}", "error")
+                # 2️ - Update TraderInfo
+                cur.execute("UPDATE TraderInfo SET starting_balance = %s", (starting_balance,))
+
+                # 3️ - Get the oldest week's id and start_date
+                cur.execute("""
+                    SELECT id, start_date
+                    FROM weeks
+                    ORDER BY start_date ASC
+                    LIMIT 1
+                """)
+                oldest = cur.fetchone()
+
+                if oldest:
+                    oldest_week_id = oldest["id"]
+                    oldest_week_date = oldest["start_date"]
+
+                    # 4️⃣ Update that oldest week's starting_balance
+                    cur.execute("""
+                        UPDATE weeks
+                        SET starting_balance = %s
+                        WHERE id = %s
+                    """, (starting_balance, oldest_week_id))
+
+                    print(f"✅ Updated oldest week {oldest_week_id} starting_balance to {starting_balance}")
+                else:
+                    print("ℹ️ No week entries found; only TraderInfo was updated.")
+
+                flash("Starting balance updated.", "ok")
+
+        except Exception as e:
+            flash(f"DB error: {e}", "error")
+
         finally:
             conn.close()
 
-        return redirect(url_for('calendar_view'))
+        # 5️⃣ Recompute from the oldest week’s start date if we have it
+        if oldest_week_date:
+            try:
+                recompute_from_date(oldest_week_date)
+                print(f"🔄 Recomputed balances from {oldest_week_date}")
+            except Exception as e:
+                print(f"⚠️ Failed to recompute from {oldest_week_date}: {e}")
+
+        return redirect(url_for("calendar_view"))
 
     return app
 
