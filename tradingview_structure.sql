@@ -15,6 +15,8 @@ DROP TRIGGER IF EXISTS trg_au_trades_recalc_day;
 
 DROP TRIGGER IF EXISTS trg_ad_trades_recalc_day;
 
+DROP TABLE IF EXISTS TraderInfo;
+
 DROP TABLE IF EXISTS trades;
 
 DROP TABLE IF EXISTS days;
